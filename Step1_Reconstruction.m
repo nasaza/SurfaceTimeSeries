@@ -15,6 +15,7 @@ addpath Data
 
 load('Data\SeasonAdjData');
 ConstrReg = csvread('Data/GeoConstraints/DE_Constraints.csv');
+mkdir('Outputs');  % creates a folder to save all of the outputs 
 
 %% Step 2: Triangulation of the selected geographic area
 % This step defines the geographical area for our analysis. In particular, 
