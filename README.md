@@ -24,7 +24,7 @@ Run the scripts in the indicated order to ensure proper execution.
 
 4) Output Structure
 
-Outputs/ – Final forecast results and supporting figures are saved in this folder.
+Outputs/ – Final forecast results and supporting figures are saved in this folder (created after runnong the first step).
 
 Data/ – Intermediate results, such as reconstructed functional time series, are stored here.
 
