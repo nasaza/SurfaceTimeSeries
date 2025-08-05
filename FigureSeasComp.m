@@ -1,17 +1,29 @@
+clear all;
+clc;
 
-%% Add Libraries and Data
+%% Add Libraries, Data and Projections
 addpath Data/
 addpath AddFunc
 load('Data\SeasComp');
+load('Data\SeasonAdjData');
 ConstrReg = csvread('Data/GeoConstraints/DE_Constraints.csv');
 
-%% Preparation of the FEM and data
-DTOzone     = delaunayTriangulation([LonOz,LatOz]);
-CleanDTOz   = ones(326,1);
-OutDTs      = [2,5,20,35,69,70,76,80,81,128,131,133,134,135,159,...
-                        173,239,248,261,308,312,315,322,323,324];
 
-CleanDTOz(OutDTs)   = zeros(length(OutDTs),1);     
+
+
+% project data on the plain (Gauss-Krüger Zone 3)
+wgs84           = geocrs(4326);
+proj            = projcrs(31467);
+[LonOz,  LatOz] = projfwd(proj, LatOz, LonOz);
+[x, y]          = projfwd(proj, ConstrReg(:,1), ConstrReg(:,2));
+ConstrReg       = [y,x];
+
+
+
+%% Preparation of the FEM 
+Threshold = 0.75;
+DTOzone     = delaunayTriangulation([LonOz,LatOz]);
+CleanDTOz   = CleanTriangulation(DTOzone,[ConstrReg(:,2),ConstrReg(:,1)],Threshold);
 
 
 bottom   = min(SeasOz,[],'all');
@@ -36,18 +48,19 @@ for m = 1:12
             % demcmap(SeasOz(:,m))
             view(2);
             hold off
+            axis equal tight;
             colormap(jet);
             caxis([bottom top])
             colorbar;
-            title(months{m});
-            xlabel('');
-            ylabel('');
+            title(months{m});          
+            xlabel('Easting');
+            ylabel('Northing');
             ax = gca;
             ax.XTick = [];
             ax.YTick = [];
 end
 
-fig.Position = [100, 100, 600, 500]; % [left, bottom, width, height] 
+fig.Position = [100, 100, 900, 1200]; % [left, bottom, width, height] 
 
 % Adjust the axes to minimize white space
 ax = gca;

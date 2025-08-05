@@ -22,6 +22,9 @@ Run Step2_Forecating: Use the reconstructed data to build forecasts.
 
 Run the scripts in the indicated order to ensure proper execution.
 
+Files with name "Figure..." replicate key figures made in the paper. These 
+files can be executed only after running Step1 and Step2.
+
 4) Output Structure
 
 Outputs/ – Final forecast results and supporting figures are saved in this folder (created after running Step1_Reconstruction.m).

@@ -17,7 +17,7 @@ function [FTSobj,coefs,FEMbasis]=Grid2Func(EnvData,DT,CleanedDT)
     % -------------------------------------------------------------------------
     % Run spatial smoothing and store smoothed fd object ozone_fd_cell
 
-    lambda   = 0.01;
+    lambda   = 1e6;
     coef_FEM = zeros(getnbasis(FEMbasisobj),T);
     for iday=1:T
         data_i              = [(1:np)', EnvData(:,iday)];

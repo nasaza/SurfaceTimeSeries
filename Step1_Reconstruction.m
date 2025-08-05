@@ -8,7 +8,7 @@ clc;
 addpath AddFunc
 addpath Data
 
-%% Step 1: Read Data
+%% Step 1: Read Data and Project
 % This step loads seasonally adjusted ozone concentration data observed
 % at different stations, along with other weather variables used in the analysis
 % and geographic borders of Germany
@@ -16,17 +16,27 @@ addpath Data
 load('Data\SeasonAdjData');
 ConstrReg = csvread('Data/GeoConstraints/DE_Constraints.csv');
 mkdir('Outputs');  % creates a folder to save all of the outputs 
+Threshold = 0.75;
+
+% project data on the plain (Gauss-Krüger Zone 3)
+wgs84           = geocrs(4326);
+proj            = projcrs(31467);
+[LonOz,  LatOz] = projfwd(proj, LatOz, LonOz);
+[x, y]          = projfwd(proj, ConstrReg(:,1), ConstrReg(:,2));
+ConstrReg       = [y,x];
+
+[XPrecip,YPrecip] = projfwd(proj, YPrecip, XPrecip);
+[XWind,  YWind]   = projfwd(proj, YWind, XWind);
+[XSun,  YSun]     = projfwd(proj, YSun, XSun);
+[XTemp,  YTemp]   = projfwd(proj, YTemp, XTemp);
 
 %% Step 2: Triangulation of the selected geographic area
 % This step defines the geographical area for our analysis. In particular, 
 % it creates a triangulation of the area for each variable and generates Figure 7 in the paper's appendix.
 
 DTOzone     = delaunayTriangulation([LonOz,LatOz]);
-OutDTs      = [2,5,20,35,69,70,76,80,81,128,131,133,134,135,159,...
-                        173,239,248,261,308,312,315,322,323,324];
-CleanDTOz           = ones(326,1);
-CleanDTOz(OutDTs)   = zeros(length(OutDTs),1);   
-
+CleanDTOz   = CleanTriangulation(DTOzone,[ConstrReg(:,2),ConstrReg(:,1)],Threshold);
+% [RemP, regP] = TriangStats(DTOzone, [ConstrReg(:,2),ConstrReg(:,1)], Threshold);
 
 DTSun       = delaunayTriangulation([XSun,YSun]);
 CleanDTSun  = CleanTriangulation(DTSun,[ConstrReg(:,2),ConstrReg(:,1)]);
@@ -43,12 +53,16 @@ CleanDTWind = CleanTriangulation(DTWind,[ConstrReg(:,2),ConstrReg(:,1)]);
 Region      = [ConstrReg(:,2),ConstrReg(:,1)];
 RegionBord  = polyshape(Region);
 
-figure(1)
-plot(RegionBord)    
+fig1 = figure(1);
+plot(RegionBord,'FaceColor', 'none'); 
 hold on;
 triplot(DTOzone(logical(CleanDTOz),:),DTOzone.Points(:,1), DTOzone.Points(:,2));
-axis equal;
+axis equal tight;
 hold off;    
+xlabel('Easting (meters)');
+ylabel('Northing (meters)');
+exportgraphics(fig1,['Outputs/FigureAppTriag.pdf'],'BackgroundColor','none','Resolution',300)
+
 
 %% Step 3: Create Functinal Data  
 % Creates surface/functional observations from gridded data. It uses
@@ -75,64 +89,3 @@ save('Data\FTSs','OzoneFTS','OzoneCoef','OzoneBasis','OzoneFTSobj',...
     'PrecipCoef','PrecipBasis','PrecipFTSobj','TempFTS',...
     'TempCoef','TempBasis','TempFTSobj','WindFTS',...
     'WindCoef','WindBasis','WindFTSobj');
-
-% If FTS are created than we can load them quicker as 
- % load('Data\FTSs');          % Data difen in the Funtional Form (seasonaly addjusted)
-
-
-%% Additional Plots 
-% This block obtains additional information about the characteristics of our surface data.
-% Specifically, it plots scree plots for each variable to help determine how many PCA components to include in our analysis.
-% Replicates Figure 9 in the paper's appendix.
-
-K_max       = 15;    
-pcastrOzone = pca3D(OzoneFTS, K_max, 1);     
-pcastrTemp  = pca3D(TempFTS(1:200), K_max, 1);     
-pcastrSun   = pca3D(SunFTS(1:200), K_max, 1);     
-pcastrWind  = pca3D(WindFTS(1:200), K_max, 1);     
-pcastrPrecip= pca3D(PrecipFTS(1:200), K_max, 1);     
-
-% plot a scree plot of explaind variance for an intuition
-h = findobj('type','figure');
-n = length(h);
-
-% scree plots
-
-figure(1);
-subplot(3,2,1)
-    plot(pcastrOzone.varprop(1:K_max));
-    title('Ozone');
-subplot(3,2,2)
-    plot(pcastrTemp.varprop(1:K_max));
-    title('Temp');
-subplot(3,2,3)
-    plot(pcastrSun.varprop(1:K_max));
-    title('Sun');
-subplot(3,2,4)
-    plot(pcastrWind.varprop(1:K_max));
-    title('Wind');
-subplot(3,2,5)
-    plot(pcastrPrecip.varprop(1:K_max))
-    title('Precip');
-
-
-    % %% Lag and dimension selection based on Aue 
-    % 
-    % [~,ANH] = InformCriteria(pcastrOzone,15,10);
-
-
-fh=figure(2);
-subplot(2,2,1)
-    autocorr(pcastrOzone.pcascr(:,1));
-    title('1st Score Series');
-subplot(2,2,2)
-    autocorr(pcastrOzone.pcascr(:,2));
-    title('2nd Score Series');
-subplot(2,2,3)
-    autocorr(pcastrOzone.pcascr(:,3));
-    title('3rd Score Series');
-subplot(2,2,4)
-    autocorr(pcastrOzone.pcascr(:,4));
-    title('4th Score Series');
-
-exportgraphics(fh, ['Outputs/AutocorrScores.pdf'], 'BackgroundColor', 'none', 'Resolution', 300);
