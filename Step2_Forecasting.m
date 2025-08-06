@@ -206,6 +206,10 @@ ylabel('MSE', 'FontSize', FS);
 exportgraphics(fh, ['Outputs/BoxplotsHorizon',num2str(h),'.pdf'], 'BackgroundColor', 'none', 'Resolution', 300);
 
 %% CI surfaces
+DTOzone     = delaunayTriangulation([LonOz,LatOz]);
+CleanDTOz   = CleanTriangulation(DTOzone,[ConstrReg(:,2),ConstrReg(:,1)],Threshold);
+Region      = [ConstrReg(:,2),ConstrReg(:,1)];
+RegionBord  = polyshape(Region);
 
 %--- Input ---
 MSurf = {MSurf1, MSurf2, MSurf3, MSurf4, MSurf5, MSurf6, MSurf7, MSurf8};
