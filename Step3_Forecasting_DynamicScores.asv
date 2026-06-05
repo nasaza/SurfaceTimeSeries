@@ -49,8 +49,8 @@ KNNs        = zeros(H,2);
 
 FEMBasOz    = OzoneBasis;
 
-MSE_MP      = zeros(N_Fors,1); 
-MSE_NP      = zeros(N_Fors,1); 
+MSE_MP      = zeros(N_Fors,1); % Stoe Mean preditor
+MSE_NP      = zeros(N_Fors,1); % Stoe Naive preditor
 MSE_RF      = zeros(N_Fors,1); 
 MSE_FAR1    = zeros(N_Fors,1);
 MSE_PCA_VAR = zeros(N_Fors,1);
@@ -60,20 +60,19 @@ MSE_DS_KNN  = zeros(N_Fors,1);
 MSE_MP_VAR  = zeros(N_Fors,1);
 MSE_MP_KNN  = zeros(N_Fors,1);
 
-% Variables to store MSE surfaces from different predictors
 
-MSurf_MP      = zeros(size(OzoneS,1),(H+1-h)); 
-MSurf_NP      = zeros(size(OzoneS,1),(H+1-h)); 
-MSurf_RF      = zeros(size(OzoneS,1),(H+1-h)); 
-MSurf_FAR1    = zeros(size(OzoneS,1),(H+1-h)); 
-MSurf_PCA_VAR = zeros(size(OzoneS,1),(H+1-h));
+% Variables to store differenct  
+MSurf_MP      = zeros(size(OzoneS,1),(H+1-h)); % Stores mean preditor surface
+MSurf_NP      = zeros(size(OzoneS,1),(H+1-h)); % Stores naive preditor surface
+MSurf_RF      = zeros(size(OzoneS,1),(H+1-h)); % Stores randpm forecast surface
+MSurf_FAR1    = zeros(size(OzoneS,1),(H+1-h)); % Stores FAR surface
+MSurf_PCA_VAR = zeros(size(OzoneS,1),(H+1-h)); % Stores mean preditor surface
 MSurf_PCA_KNN = zeros(size(OzoneS,1),(H+1-h)); 
 MSurf_DS_VAR  = zeros(size(OzoneS,1),(H+1-h)); 
 MSurf_DS_KNN  = zeros(size(OzoneS,1),(H+1-h)); 
 MSurf_MP_VAR  = zeros(size(OzoneS,1),(H+1-h)); 
 MSurf_MP_KNN  = zeros(size(OzoneS,1),(H+1-h)); 
 
-% Number of components and lags considered 
 L_set = [3 1 1 1 1]; % Ozone, Sun, Precip, Temp, Wind
 m_set = [2 1 1 1 1];
 
