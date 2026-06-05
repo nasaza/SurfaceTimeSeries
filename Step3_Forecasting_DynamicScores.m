@@ -84,14 +84,15 @@ m_set = [2 1 1 1 1];
 
 tic
 
-parfor i=1:(H+1-h)    
+for i=1:(H+1-h)    
 %% Part of the data to be used for estimation
     nobs_i      = T-H+i-1;
     TrueVal     = OzoneS(:,nobs_i+h);    
     OzoneFTSi   = fd(OzoneCoef(:,1:nobs_i),OzoneBasis);
     
 %% Functional Persepctive (FP): fPCA for the available observations T-(H-1)+i
-
+    
+    DynamScores = DynamScoresSurf({OzoneCoef(:,1:nobs_i),OzoneBasis}, K_max, 1, 2); 
     pcastrOz_i  = pca3D({OzoneCoef(:,1:nobs_i),OzoneBasis}, K_max, 1); 
     pcastrS_i   = pca3D({SunCoef(:,1:nobs_i),SunBasis}, K_max, 1); 
     pcastrP_i   = pca3D({PrecipCoef(:,1:nobs_i),PrecipBasis}, K_max, 1); 

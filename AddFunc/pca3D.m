@@ -1,64 +1,90 @@
 function pcastr = pca3D(FTSobj, npca, centerfd)
-%  PCA Functional principal components analysis for surface (functional)
-%  time series
+% PCA3D Functional principal component analysis for surface time series.
+%
 % Inputs:
-%  - fdobj          functional time series;
-%  - npca           number of pca components/factors to be computed;
-%  - centerfd       centered or not centered data; 0 for not centered and 1
-%                   for centered
+%   FTSobj   - fd object or {coefficients, basis}
+%   npca     - number of principal components
+%   centerfd - 1 if data should be centered, 0 otherwise
+%
+% Output:
+%   pcastr   - structure with loadings, scores, eigenvalues, varprop, meanfd
 
-%% Step 0: Checking wich variable are passe to the function
-n_inputs = length(FTSobj);
-if n_inputs==1
-    fdobj=FTSobj;
-elseif n_inputs==2
-    fdobj=fd(FTSobj{1},FTSobj{2});
-% elseif n_inputs==3
-%     fdobj=FTSobj{1};    
-else
-    disp('Wring FTS object is used as input. Use either only FTS or FTS and corresponding FTS coeff with basis to speed up code');
-    return
-end
-
-%% Step 1:
-meanfd = mean(fdobj); % calculate the mean
+%% Step 0: defaults and input
 
 if nargin < 3
-    centerfn = 0;   %  subtract mean from data before PCA
+    centerfd = 0;
 end
 
-if centerfd == 1     
-    fdobj  = center(fdobj);
+if isa(FTSobj,'fd')
+    fdobj = FTSobj;
+elseif iscell(FTSobj) && length(FTSobj)==2
+    fdobj = fd(FTSobj{1}, FTSobj{2});
+else
+    error('Wrong FTS object. Use either fd object or {coefficients,basis}.');
 end
 
-%% Step 2: get coefficients of FTS in basis representation
-BasisFD    = getbasis(fdobj);
-coef_FTS   = getcoef(fdobj)';
-[T,~]      = size(coef_FTS);
+%% Step 1: mean and centering
 
-%% Step 3: Calculate estimate of the Cov of fdobj
+meanfd = mean(fdobj);
 
-CovX       = 1/T*(coef_FTS'*coef_FTS);
+if centerfd == 1
+    fdobj = center(fdobj);
+end
 
-%% Step 4: calculate  nharm eigenvectors of CovX
+%% Step 2: coefficients and FEM mass matrix
 
-[Theta,D]  = eig(CovX); % Theta is a matrix that contains coeff of eigencalues in BasisFD
-                        % D if diagonal matrix with eigenvalues
-eigvals    = diag(D);
-[~,inds]   = sort(eigvals);
-eigvals    = eigvals(flip(inds));
-Theta      = Theta(:,flip(inds));
+BasisFD  = getbasis(fdobj);
+coef_FTS = getcoef(fdobj)';     % T x nbasis
+[T, nbasis] = size(coef_FTS);
 
-%% Step 5: Saving outputs 
-scores     = coef_FTS*Theta;
-varprop    = 1/sum(eigvals)*cumsum(eigvals);
-harmfd     = fd(Theta, BasisFD);
+if npca > nbasis
+    error('npca cannot exceed the number of basis functions.');
+end
 
+G = FEMMassMatrix(BasisFD);
+G = (G + G')/2;
+
+R = chol(G + 1e-10*speye(size(G,1)), 'upper');
+
+% Orthonormalized coordinates
+Z = coef_FTS * R';
+
+%% Step 3: covariance in orthonormalized coordinates
+
+CovZ = (Z' * Z) / T;
+CovZ = (CovZ + CovZ')/2;
+
+%% Step 4: eigendecomposition
+
+[U,D] = eig(CovZ);
+
+eigvals = diag(D);
+[eigvals, inds] = sort(eigvals,'descend');
+U = U(:,inds);
+
+eigvals(eigvals < 0 & abs(eigvals) < 1e-10) = 0;
+
+if sum(eigvals) > 0
+    varprop = cumsum(eigvals) / sum(eigvals);
+else
+    varprop = NaN(size(eigvals));
+end
+
+%% Step 5: transform loadings back to FEM basis
+
+Theta = R \ U;
+Theta = Theta(:,1:npca);
+
+scores = coef_FTS * G * Theta;
+harmfd = fd(Theta, BasisFD);
+
+%% Step 6: save output
 
 pcastr.pcafd   = harmfd;
 pcastr.values  = eigvals(1:npca);
-pcastr.pcascr  = scores(:,1:npca);
+pcastr.pcascr  = scores;
 pcastr.varprop = varprop;
 pcastr.meanfd  = meanfd;
+pcastr.method  = 'static';
 
-
+end
