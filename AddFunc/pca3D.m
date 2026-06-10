@@ -9,6 +9,7 @@ function pcastr = pca3D(FTSobj, npca, centerfd)
 % Output:
 %   pcastr   - structure with loadings, scores, eigenvalues, varprop, meanfd
 
+
 %% Step 0: defaults and input
 
 if nargin < 3
@@ -85,6 +86,5 @@ pcastr.values  = eigvals(1:npca);
 pcastr.pcascr  = scores;
 pcastr.varprop = varprop;
 pcastr.meanfd  = meanfd;
-pcastr.method  = 'static';
 
 end
