@@ -101,7 +101,7 @@ harmfd  = fd(Theta, BasisFD);
 
 DS.pcafd   = harmfd;
 DS.values  = eigvals(1:npca);
-DS.scr     = scores(:,1:npca);
+DS.pcascr  = scores(:,1:npca);
 DS.varprop = varprop;
 DS.meanfd  = meanfd;
 

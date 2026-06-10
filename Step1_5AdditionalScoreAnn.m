@@ -60,16 +60,16 @@ subplot(2,2,4)
 % Autocovariances     
 fg2=figure(3);
 subplot(2,2,1)
-    autocorr(dyn_scs.scr(:,1));
+    autocorr(dyn_scs.pcascr(:,1));
     title('1st Score Series');
 subplot(2,2,2)
-    autocorr(dyn_scs.scr(:,2));
+    autocorr(dyn_scs.pcascr(:,2));
     title('2nd Score Series');
 subplot(2,2,3)
-    autocorr(dyn_scs.scr(:,3));
+    autocorr(dyn_scs.pcascr(:,3));
     title('3rd Score Series');
 subplot(2,2,4)
-    autocorr(dyn_scs.scr(:,4));
+    autocorr(dyn_scs.pcascr(:,4));
     title('4th Score Series');
 
 

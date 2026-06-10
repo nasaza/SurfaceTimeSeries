@@ -2,7 +2,7 @@ function FPredGrid = DFFM_VARX_GRID(DepV,AddVar1,AddVar2,AddVar3,AddVar4,L_Set,m
 % This procedure performs forecasting based on factros extracted from 
 %  several time series; Based on Aue et al (2015) Section 4
 
-%% Step 1: Factro Decomposition
+%% Step 1: Factor Decomposition
 
     PCA_Dep     = FactorDecompFTSGrid(DepV, L_Set(1), 1);
     PCA_X1      = FactorDecompFTSGrid(AddVar1, L_Set(2), 1);
