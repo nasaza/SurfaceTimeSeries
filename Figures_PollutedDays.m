@@ -1,191 +1,296 @@
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Forecasts Comparison
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Figures: Polluted Days
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 clear all;
 clc;
 
+%% Short Info
+% This script creates forecast-surface figures for the two high-pollution
+% days in the forecasting period. The script uses the same forecasting
+% specifications as the main forecasting comparison and adds back the
+% seasonal component in order to plot the surfaces on the original scale.
+%
+% Output files are saved directly to the Outputs folder.
+
 %% Add Libraries
+
 addpath AddFunc
 addpath Data
 
+%% User settings
+% Practitioners may want to change only this block.
+
+H        = 165;      % Number of forecast origins in the evaluation period
+h        = 1;        % Forecast horizon
+K_max    = 10;       % Maximum number of scores computed
+KNN_max  = 50;       % Maximum number of neighbours searched in KNN methods
+q_dyn    = 2;        % Lag order in cumulative autocovariance operator
+
+% These are the two forecast-period indices corresponding to the polluted
+% days discussed in the paper. If the data set is changed, these indices
+% should be updated accordingly.
+PollutedDays = [36 38];
+
+% Seasonal component added back to seasonally adjusted forecasts.
+% In the original empirical illustration this was SeasOz(:,8).
+% If the polluted days change, verify that this seasonal component is still
+% the appropriate one.
+seasonalComponentIndex = 8;
+
+% Number of components and lags used in the forecasting methods.
+% The first entry corresponds to ozone. The following entries correspond to
+% Sun, Precipitation, Temperature, and Wind, respectively.
+Static_L_set = [3 1 1 1 1];
+Static_m_set = [2 1 1 1 1];
+
+Dyn_L_set    = [4 1 1 1 1];
+Dyn_m_set    = [2 1 1 1 1];
+
+Threshold = 0.75;   % Triangulation cleaning threshold
+
+outFolder = fullfile(pwd,'Outputs');
+if ~exist(outFolder,'dir')
+    mkdir(outFolder);
+end
+
 %% Step 1: Read Data
 
-load('Data\SeasonAdjData'); % Data on the grid seasonaly addjusted
-load('Data\FTSs');          % Data difen in the Funtional Form (seasonaly addjusted)
-ConstrReg = csvread('Data/GeoConstraints/DE_Constraints.csv');
-load('Data\SeasComp');      % Loads seasonal componet
+load(fullfile('Data','SeasonAdjData'));  % Seasonally adjusted grid data
+load(fullfile('Data','FTSs'));           % Functional/surface data from Step 1
+load(fullfile('Data','SeasComp'));       % Seasonal components
+ConstrReg = csvread(fullfile('Data','GeoConstraints','DE_Constraints.csv'));
+[~,T] = size(OzoneS);
 
+%% Step 2: Project Coordinates
+% Coordinates are projected to Gauss-Krüger Zone 3, EPSG:31467.
 
-% project data on the plain (Gauss-Krüger Zone 3)
-wgs84           = geocrs(4326);
-proj            = projcrs(31467);
+proj = projcrs(31467);
+
 [LonOz,  LatOz] = projfwd(proj, LatOz, LonOz);
 [x, y]          = projfwd(proj, ConstrReg(:,1), ConstrReg(:,2));
 ConstrReg       = [y,x];
+
 [XPrecip,YPrecip] = projfwd(proj, YPrecip, XPrecip);
 [XWind,  YWind]   = projfwd(proj, YWind, XWind);
-[XSun,  YSun]     = projfwd(proj, YSun, XSun);
+[XSun,   YSun]    = projfwd(proj, YSun, XSun);
 [XTemp,  YTemp]   = projfwd(proj, YTemp, XTemp);
 
+%% Step 3: Triangulation for Plotting
 
-%% Step 2: Initial values for forecast comparison
-H           = 165;  %set forecast horizon
+DTOzone   = delaunayTriangulation([LonOz,LatOz]);
+CleanDTOz = CleanTriangulation(DTOzone,[ConstrReg(:,2),ConstrReg(:,1)],Threshold);
 
-[~,T]       = size(OzoneS);
-K_max       = 15;
-p_max       = 5;    % Maximum nuber of lag considered in the analysis
-KNN_max     = 100;   % Maximum number of KNN in the calibraiton
+Region     = [ConstrReg(:,2),ConstrReg(:,1)];
+RegionBord = polyshape(Region);
 
-FEMBasOz    = OzoneBasis;
+FEMBasOz = OzoneBasis;
+SeasComp = SeasOz(:,seasonalComponentIndex);
 
+%% Step 4: Forecast and Plot the Polluted Days
 
-L_set = [3 1 1 1 1]; %Ozone, Sun, Precip, Temp, Wind
-m_set = [2 1 1 1 1];
- 
-   
-DTOzone     = delaunayTriangulation([LonOz,LatOz]);
-CleanDTOz   = CleanTriangulation(DTOzone,[ConstrReg(:,2),ConstrReg(:,1)],0.75);
-Region      = [ConstrReg(:,2),ConstrReg(:,1)];
-RegionBord  = polyshape(Region);
+Models = {'True Surface','MF','NF','FAR','PCA VAR','PCA KNN','DS VAR','DS KNN', ...
+          'MP VAR','MP KNN','DS RF'};
+PollutedResults = struct();
 
-
-        
-%% Step 3: Forecasting with Different Methods
-h=1;
 tic
-for i=1:H 
-    if (i==36)|(i==38)
 
-        %runs loop with updating information 
-        % information can be updates with all parameters or without updating
-        % K,p,L,q
-    %% Recover part of the data to be used for estimation
-        nobs_i      = T-H+i-1;
-        TrueVal     = OzoneS(:,T-H+i)+SeasOz(:,8);
+for pp = 1:length(PollutedDays)
 
-        OzoneFTSi   = fd(OzoneCoef(:,1:T-H+i-1),OzoneBasis);
+    i = PollutedDays(pp);
 
-    %% Functional Persepctive (FP): fPCA for the available observations T-(H-1)+i
+    fprintf('\nCreating polluted-day figure %d/%d: forecast-period index %d.\n', ...
+            pp, length(PollutedDays), i);
 
-        pcastrOz_i  = pca3D({OzoneCoef(:,1:T-H+i-1),OzoneBasis}, K_max, 1); 
-        pcastrS_i   = pca3D({SunCoef(:,1:T-H+i-1),SunBasis}, K_max, 1); 
-        pcastrP_i   = pca3D({PrecipCoef(:,1:T-H+i-1),PrecipBasis}, K_max, 1); 
-        pcastrT_i   = pca3D({TempCoef(:,1:T-H+i-1),TempBasis}, K_max, 1); 
-        pcastrW_i   = pca3D({WindCoef(:,1:T-H+i-1),WindBasis}, K_max, 1); 
-        PCA_addreg  = {pcastrS_i,pcastrP_i,pcastrT_i,pcastrW_i};
+    %% Forecast origin
 
-    %% Method 1: (FP) Mean Predictor
+    nobs_i  = T-H+i-1;
+    TrueVal = OzoneS(:,nobs_i+h) + SeasComp;
 
-        MSurf1      = mean(OzoneS(:,1:T-H+i-1),2)+SeasOz(:,8);
+    %% Static and dynamic scores
 
-    %% Method 2: (FP) Naive Predictor
+    dynstrOz_i = DynamScoresSurf({OzoneCoef(:,1:nobs_i),OzoneBasis}, ...
+                                  K_max, 1, q_dyn);
 
-        MSurf2      = OzoneS(:,T-H+i-1)+SeasOz(:,8);
+    pcastrOz_i = pca3D({OzoneCoef(:,1:nobs_i),OzoneBasis}, K_max, 1);
 
-    %% Method 3: (FP) FAR(1)
+    pcastrS_i  = pca3D({SunCoef(:,1:nobs_i),SunBasis}, K_max, 1);
+    pcastrP_i  = pca3D({PrecipCoef(:,1:nobs_i),PrecipBasis}, K_max, 1);
+    pcastrT_i  = pca3D({TempCoef(:,1:nobs_i),TempBasis}, K_max, 1);
+    pcastrW_i  = pca3D({WindCoef(:,1:nobs_i),WindBasis}, K_max, 1);
 
-        FuncPredCoeff   = SFAR1(pcastrOz_i,5,h);
-        FuncPred        = fd(FuncPredCoeff,FEMBasOz);
-        FPointEval      = eval_FEM_fd(LonOz,LatOz,FuncPred);
-        MSurf3          = FPointEval+SeasOz(:,8);
+    PCA_addreg = {pcastrS_i,pcastrP_i,pcastrT_i,pcastrW_i};
 
-    %% Method 4: (FP) Linear Forecast with scree plot estimates
+    %% Method 1: Mean Forecast
 
-        FuncPredCoeff   = FFM_VARX(pcastrOz_i,PCA_addreg,L_set,m_set,h);
-        FuncPred        = fd(FuncPredCoeff,FEMBasOz);
-        FPointEval      = eval_FEM_fd(LonOz,LatOz,FuncPred);
-        MSurf4          = FPointEval+SeasOz(:,8);
+    MSurf_MF = mean(OzoneS(:,1:nobs_i),2) + SeasComp;
 
-    %% Method 5: (Multivariate) Linear Forecast with scree plot estimates
+    %% Method 2: Naive Forecast
 
-        FPredGrid     = DFFM_VARX_GRID(OzoneS(:,1:T-H+i-1),WindS(:,1:T-H+i-1),...
-                            SunS(:,1:T-H+i-1),PrecipS(:,1:T-H+i-1),...
-                            TempS(:,1:T-H+i-1),L_set,m_set,h);
-       MSurf5         = FPredGrid+SeasOz(:,8);
+    MSurf_NF = OzoneS(:,nobs_i) + SeasComp;
 
+    %% Method 3: FAR
 
-    % %% Method 6: (FP) Nonlinear Forecast with KNN
-    % % The code for model 6 has two parts. One with searching over optimal KNNs
-    % % post selection and one runs with KNN=10
-    % %-> Part 1: Estimating number of neigbours
-    %     K_NNv        = zeros(KNN_max,1) ;
-    %     pcastrKNN_i  = pca3D({OzoneCoef(:,1:T-H+i-2),OzoneBasis}, K_max, 1); 
-    %     for knn = 1:KNN_max
-    %         FuncPredCoeff  = FFM_KNN(pcastrKNN_i,L_set(1),m_set(1),knn);
-    %         FuncPred       = fd(FuncPredCoeff,FEMBasOz);
-    %         FPointEval     = eval_FEM_fd(LonOz,LatOz,FuncPred);
-    %         K_NNv(knn,1)   = mean((OzoneS(:,T-H+i-1)-FPointEval).^2);
-    %     end
-    %     [~,K_min]     = min(K_NNv);
-    %     KNNs(i,:)     = K_min;
-    % %-> Part 2    
-    %     FuncPredCoeff  = FFM_KNN(pcastrOz_i,L_set(1),m_set(1),K_min);
-    %     FuncPred       = fd(FuncPredCoeff,FEMBasOz);
-    %     FPointEval     = eval_FEM_fd(LonOz,LatOz,FuncPred);
-    %     MSurf6         = FPointEval+SeasOz(:,8);
+    FuncPredCoeff = SFAR1(pcastrOz_i,Static_L_set(1),h);
+    FuncPred      = fd(FuncPredCoeff,FEMBasOz);
+    FPointEval    = eval_FEM_fd(LonOz,LatOz,FuncPred);
+    MSurf_FAR     = FPointEval + SeasComp;
 
+    %% Method 4: PCA VAR
 
-    %% Method 7: (MP) Nonlinear Forecast with KNN 
-    % The code for model 7 (as for model 6) has two parts. One with searching over optimal KNNs
-    % post selection and one runs with KNN=10
-    %-> Part 1
-    %     K_NNv       = zeros(KNN_max,1);
-    %     pcastr_i    = FactorDecompFTSGrid(OzoneS(:,1:T-H+i-2), K_max, 1);
-    %     for knn = 1:KNN_max
-    %         FPredGrid      = DFFM_KNN_GRID(pcastr_i,L_set(1),m_set(1),knn);
-    %         K_NNv(knn,1)   = mean((OzoneS(:,T-H+i-1)-FPredGrid).^2);
-    %     end
-    %     [~,K_min]      = min(K_NNv);
-    %     KNNGs(i,:)     = K_min;
-    % %-> Part 2
-    %     pcastr_i       = FactorDecompFTSGrid(OzoneS(:,1:T-H+i-1), K_max, 1);
-    %     FPredGrid      = DFFM_KNN_GRID(pcastr_i,L_set(1),m_set(1),K_min);
-    %     MSurf7         = FPredGrid+SeasOz(:,8);   
-        
-     %% Plot forecast surfaces     
-        fig = figure;
-%         Models      = {'True Surf','MP', 'NP', 'FAR', 'LGF', 'LSF', 'NGF', 'NSF'};
-%         SurfArray   = {TrueVal, MSurf1, MSurf2, MSurf3, MSurf5, MSurf4, MSurf7, MSurf6};
-%         
-%         bottom   = min([TrueVal, MSurf1, MSurf2, MSurf3, MSurf5, MSurf4, MSurf7, MSurf6],[],'all');
-%         top      = max([TrueVal, MSurf1, MSurf2, MSurf3, MSurf5, MSurf4, MSurf7, MSurf6],[],'all');
+    FuncPredCoeff = FFM_VARX(pcastrOz_i,PCA_addreg,Static_L_set,Static_m_set,h);
+    FuncPred      = fd(FuncPredCoeff,FEMBasOz);
+    FPointEval    = eval_FEM_fd(LonOz,LatOz,FuncPred);
+    MSurf_PCA_VAR = FPointEval + SeasComp;
 
-        Models      = {'True Surf', 'FAR', 'LGF', 'LSF'};
-        SurfArray   = {TrueVal, MSurf3, MSurf5, MSurf4};
-        
-        bottom   = min([TrueVal, MSurf3, MSurf5, MSurf4],[],'all');
-        top      = max([TrueVal, MSurf3, MSurf5, MSurf4],[],'all');
+    %% Method 5: PCA KNN
+    K_NNv       = zeros(KNN_max,1);
+    pcastrKNN_i = pca3D({OzoneCoef(:,1:nobs_i-h),OzoneBasis}, K_max, 1);
 
-        for m = 1:length(Models) 
-                    Season  = Grid2Func(SurfArray{m},DTOzone,CleanDTOz);
-                    subplot(1,4,m)
-%                     subplot(1,4,m)
-                    hold on
-                    plot(RegionBord,'FaceColor', 'none');
-                    plot(Season,[],[],[],100);
-                    hold off
-                    axis equal tight
-                    colorbar
-                    colormap(jet)    
-                    % if m==length(Models) 
-                    caxis([min(SurfArray{m},[],'all') max(SurfArray{m},[],'all')])
-                    colorbar;
-                    % end
-                    view(2);
-                    title(Models{m});
-                    xlabel('Easting');
-                    ylabel('Northing');
-                    % ax = gca;
-                    % ax.XTick = [];
-                    % ax.YTick = [];
-        end
-        fig.Position = [100, 100, 1200, 300]; % [left, bottom, width, height] 
-        exportgraphics(fig,['Outputs/FSurfaces',num2str(i),'.pdf'],'BackgroundColor','none','Resolution',300,'ContentType', 'vector')   
+    for knn = 1:KNN_max
+
+        FuncPredCoeff = FFM_KNN(pcastrKNN_i,Static_L_set(1),Static_m_set(1),knn,h);
+        FuncPred      = fd(FuncPredCoeff,FEMBasOz);
+        FPointEval    = eval_FEM_fd(LonOz,LatOz,FuncPred);
+
+        K_NNv(knn,1) = mean((OzoneS(:,nobs_i)-FPointEval).^2);
 
     end
-    i
+
+    [~,K_min_PCA] = min(K_NNv);
+
+    FuncPredCoeff = FFM_KNN(pcastrOz_i,Static_L_set(1),Static_m_set(1),K_min_PCA,h);
+    FuncPred      = fd(FuncPredCoeff,FEMBasOz);
+    FPointEval    = eval_FEM_fd(LonOz,LatOz,FuncPred);
+    MSurf_PCA_KNN = FPointEval + SeasComp;
+
+    %% Method 6: DS VAR
+    FuncPredCoeff = FFM_VARX(dynstrOz_i,PCA_addreg,Dyn_L_set,Dyn_m_set,h);
+    FuncPred      = fd(FuncPredCoeff,FEMBasOz);
+    FPointEval    = eval_FEM_fd(LonOz,LatOz,FuncPred);
+    MSurf_DS_VAR  = FPointEval + SeasComp;
+
+    %% Method 7: DS KNN
+    K_NNv       = zeros(KNN_max,1);
+    dynstrKNN_i = DynamScoresSurf({OzoneCoef(:,1:nobs_i-h),OzoneBasis}, ...
+                                   K_max, 1, q_dyn);
+
+    for knn = 1:KNN_max
+
+        FuncPredCoeff = FFM_KNN(dynstrKNN_i,Dyn_L_set(1),Dyn_m_set(1),knn,h);
+        FuncPred      = fd(FuncPredCoeff,FEMBasOz);
+        FPointEval    = eval_FEM_fd(LonOz,LatOz,FuncPred);
+
+        K_NNv(knn,1) = mean((OzoneS(:,nobs_i)-FPointEval).^2);
+
+    end
+
+    [~,K_min_DS]  = min(K_NNv);
+    FuncPredCoeff = FFM_KNN(dynstrOz_i,Dyn_L_set(1),Dyn_m_set(1),K_min_DS,h);
+    FuncPred      = fd(FuncPredCoeff,FEMBasOz);
+    FPointEval    = eval_FEM_fd(LonOz,LatOz,FuncPred);
+    MSurf_DS_KNN  = FPointEval + SeasComp;
+
+    %% Method 8: MP VAR
+    FPredGrid = DFFM_VARX_GRID(OzoneS(:,1:nobs_i), WindS(:,1:nobs_i), ...
+                               SunS(:,1:nobs_i), PrecipS(:,1:nobs_i), ...
+                               TempS(:,1:nobs_i), Static_L_set,Static_m_set,h);
+
+    MSurf_MP_VAR = FPredGrid + SeasComp;
+
+    %% Method 9: MP KNN
+    K_NNv    = zeros(KNN_max,1);
+    pcastr_i = FactorDecompFTSGrid(OzoneS(:,1:nobs_i-h), K_max, 1);
+
+    for knn = 1:KNN_max
+
+        FPredGrid = DFFM_KNN_GRID(pcastr_i,Static_L_set(1),Static_m_set(1),knn);
+        K_NNv(knn,1) = mean((OzoneS(:,nobs_i)-FPredGrid).^2);
+
+    end
+
+    [~,K_min_MP] = min(K_NNv);
+
+    pcastr_i     = FactorDecompFTSGrid(OzoneS(:,1:nobs_i), K_max, 1);
+    FPredGrid    = DFFM_KNN_GRID(pcastr_i,Static_L_set(1),Static_m_set(1),K_min_MP);
+    MSurf_MP_KNN = FPredGrid + SeasComp;
+
+    %% Method 10: DS Random Forest
+
+    FuncPredCoeff = FRandomForest(dynstrOz_i,Dyn_L_set(1),h);
+    FuncPred      = fd(FuncPredCoeff,FEMBasOz);
+    FPointEval    = eval_FEM_fd(LonOz,LatOz,FuncPred);
+    MSurf_RF      = FPointEval + SeasComp;
+
+    %% Store forecast surfaces
+
+    SurfArray = {TrueVal, MSurf_MF, MSurf_NF, MSurf_FAR, ...
+                 MSurf_PCA_VAR, MSurf_PCA_KNN, MSurf_DS_VAR, MSurf_DS_KNN, ...
+                 MSurf_MP_VAR, MSurf_MP_KNN, MSurf_RF};
+
+    PollutedResults(pp).ForecastIndex = i;
+    PollutedResults(pp).nobs_i        = nobs_i;
+    PollutedResults(pp).Models        = Models;
+    PollutedResults(pp).SurfArray     = SurfArray;
+    PollutedResults(pp).K_min_PCA     = K_min_PCA;
+    PollutedResults(pp).K_min_DS      = K_min_DS;
+    PollutedResults(pp).K_min_MP      = K_min_MP;
+
+    %% Plot forecast surfaces
+
+    allVals = cell2mat(SurfArray);
+    bottom  = min(allVals,[],'all');
+    top     = max(allVals,[],'all');
+
+    fig = figure;
+    fig.Position = [100, 100, 1600, 850];
+
+    for mm = 1:length(Models)
+
+        subplot(3,4,mm)
+
+        Season = Grid2Func(SurfArray{mm},DTOzone,CleanDTOz);
+
+        hold on
+            plot(RegionBord,'FaceColor','none');
+            plot(Season,[],[],[],100);
+        hold off
+
+        axis equal tight
+        colormap(jet)
+        clim([bottom top])
+        colorbar
+        view(2)
+
+        title(Models{mm});
+        xlabel('Easting');
+        ylabel('Northing');
+
+    end
+
+    sgtitle(['Polluted Day Forecasts: forecast-period index ',num2str(i)]);
+
+    pdfName = fullfile(outFolder,['Figures_PollutedDay_',num2str(i),'.pdf']);
+    pngName = fullfile(outFolder,['Figures_PollutedDay_',num2str(i),'.png']);
+    figName = fullfile(outFolder,['Figures_PollutedDay_',num2str(i),'.fig']);
+
+    exportgraphics(fig,pdfName, ...
+        'BackgroundColor','none', ...
+        'Resolution',300, ...
+        'ContentType','vector');
+
+    exportgraphics(fig,pngName, ...
+        'BackgroundColor','white', ...
+        'Resolution',300);
+
+    savefig(fig,figName);
+
+    fprintf('Saved polluted-day figures for index %d.\n', i);
+
 end
+
 toc
 
+save(fullfile(outFolder,'Figures_PollutedDays_Results.mat'),'PollutedResults');
 
-%% MSE surfaces
+fprintf('\nFigures_PollutedDays completed successfully.\n');
+fprintf('Outputs saved to: %s\n', outFolder);
