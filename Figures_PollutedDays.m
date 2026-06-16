@@ -24,9 +24,15 @@ clc;
 % Outputs are saved directly to the Outputs folder.
 
 %% Add Libraries
+scriptFolder = fileparts(mfilename('fullpath')); % Repository path
+rootFolder   = scriptFolder;
 
-addpath AddFunc
-addpath Data
+addpath(fullfile(rootFolder,'AddFunc'));
+dataFolder   = fullfile(rootFolder,'Data');
+outFolder    = fullfile(rootFolder,'Outputs');
+if ~exist(outFolder,'dir')
+    mkdir(outFolder);
+end
 
 %% User settings
 % Practitioners may want to change only this block.
@@ -48,7 +54,7 @@ seasonalComponentIndex = 8;
 
 % Static PCA specification:
 % entries correspond to Ozone, Sun, Precipitation, Temperature, and Wind.
-Static_L_set = [5 1 1 1 1];
+Static_L_set = [8 1 1 1 1];
 Static_m_set = [2 1 1 1 1];
 
 % Dynamic-score specification:
@@ -65,12 +71,10 @@ end
 
 %% Step 1: Read Data
 
-load(fullfile('Data','SeasonAdjData'));  % Seasonally adjusted grid data
-load(fullfile('Data','FTSs'));           % Functional data created in Step 1
-load(fullfile('Data','SeasComp'));       % Seasonal components
-
-ConstrReg = csvread( ...
-    fullfile('Data','GeoConstraints','DE_Constraints.csv'));
+load(fullfile(dataFolder,'SeasonAdjData.mat')); % Seasonally adjusted grid data
+load(fullfile(dataFolder,'FTSs.mat'));          % Functional data created in Step 1
+load(fullfile(dataFolder,'SeasComp.mat'));      % Seasonal components
+ConstrReg = readmatrix(fullfile(dataFolder,'GeoConstraints','DE_Constraints.csv'));
 
 [~,T] = size(OzoneS);
 
@@ -241,17 +245,12 @@ for pp = 1:nDays
 
         xlabel('Easting');
         ylabel('Northing');
-
-        % % Display one color bar per row to reduce visual clutter.
-        % if mm == nModels
-        %     colorbar;
-        % end
-
+      
     end
 
 end
 
-%title(TL,'Polluted Days: Observed Surfaces and Linear Forecasts');
+
 
 %% Step 6: Save Figure and Forecast Surfaces
 

@@ -5,22 +5,27 @@ clc;
 % This file creates functiona time sereis
 
 %% Add Libraries and Data
-addpath AddFunc
-addpath Data
+scriptFolder = fileparts(mfilename('fullpath')); % Repository path
+rootFolder   = scriptFolder;
+
+addpath(fullfile(rootFolder,'AddFunc'));
+dataFolder   = fullfile(rootFolder,'Data');
+outFolder    = fullfile(rootFolder,'Outputs');
+if ~exist(outFolder,'dir')
+    mkdir(outFolder);
+end
 
 %% Step 1: Read Data and Project
 % This step loads seasonally adjusted ozone concentration data observed
 % at different stations, along with other weather variables used in the analysis
 % and geographic borders of Germany
 
-load('Data\SeasonAdjData');
-ConstrReg = csvread('Data/GeoConstraints/DE_Constraints.csv');
+% load('Data\SeasonAdjData');
+% ConstrReg = csvread('Data/GeoConstraints/DE_Constraints.csv');
 
-outFolder = fullfile(pwd,'Outputs');
+load(fullfile(dataFolder,'SeasonAdjData.mat'));  % seasonally adjusted data on observed locations
+ConstrReg = readmatrix(fullfile(dataFolder,'GeoConstraints','DE_Constraints.csv'));
 
-if ~exist(outFolder,'dir')
-    mkdir(outFolder);
-end
 
 Threshold = 0.75;
 
@@ -67,8 +72,8 @@ axis equal tight;
 hold off;    
 xlabel('Easting (meters)');
 ylabel('Northing (meters)');
-exportgraphics(fig1,['Outputs/FigureAppTriag.pdf'],'BackgroundColor','none','Resolution',300)
-
+exportgraphics(fig1, fullfile(outFolder,'FigureAppTriangulation.pdf'), ...
+    'BackgroundColor','none', 'Resolution',300);
 
 %% Step 3: Create Functinal Data  
 % Creates surface/functional observations from gridded data. It uses
@@ -90,7 +95,7 @@ SunFTSobj                          = {SunFTS,SunCoef,SunBasis};
 PrecipFTSobj                       = {PrecipFTS,PrecipCoef,PrecipBasis};
 TempFTSobj                         = {TempFTS,TempCoef,TempBasis};
 WindFTSobj                         = {WindFTS,WindCoef,WindBasis};
-save('Data\FTSs','OzoneFTS','OzoneCoef','OzoneBasis','OzoneFTSobj',...
+save(fullfile(dataFolder,'FTSs.mat'),'OzoneFTS','OzoneCoef','OzoneBasis','OzoneFTSobj',...
     'SunFTS','SunCoef','SunBasis','SunFTSobj','PrecipFTS',...
     'PrecipCoef','PrecipBasis','PrecipFTSobj','TempFTS',...
     'TempCoef','TempBasis','TempFTSobj','WindFTS',...
