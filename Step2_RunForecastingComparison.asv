@@ -66,10 +66,10 @@ q_dyn   = 2;      % number of lags in the cumulative autocovariance operator
 %       ozone uses 4 scores;
 %       each covariate uses 1 score.
 
-Static_L_set = [8 1 1 1 1];   % static FPCA score dimensions
+Static_L_set = [5 1 1 1 1];   % static FPCA score dimensions
 Static_m_set = [2 1 1 1 1];   % static FPCA lag orders
 
-Dyn_L_set    = [4 1 1 1 1];   % dynamic-score dimensions
+Dyn_L_set    = [5 1 1 1 1];   % dynamic-score dimensions
 Dyn_m_set    = [2 1 1 1 1];   % dynamic-score lag orders
 
 % Surface reconstruction / plotting settings
@@ -170,9 +170,7 @@ for i = 1:N_Fors
     %% Part of the data used for estimation
 
     nobs_i  = T-H+i-1;
-    TrueFD  = fd(OzoneCoef(:,nobs_i+h),OzoneBasis);
-    TrueVal = eval_FEM_fd(LonOz,LatOz,TrueFD);
-    % TrueVal = OzoneS(:,nobs_i+h);
+    TrueVal = OzoneS(:,nobs_i+h);
 
     %% Static and dynamic scores
 
