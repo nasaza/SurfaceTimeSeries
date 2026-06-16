@@ -52,7 +52,7 @@ end
 % Change these values if you want to run a different specification.
 
 H       = 165;    % number of final observations used for forecast evaluation
-h       = 3;      % forecast horizon; h = 1 is the main paper specification
+h       = 7;      % forecast horizon; h = 1 is the main paper specification
 K_max   = 10;     % maximum number of estimated scores/components
 KNN_max = 50;     % maximum number of neighbours considered in KNN calibration
 q_dyn   = 2;      % number of lags in the cumulative autocovariance operator
