@@ -58,21 +58,21 @@ Static_L_set = [8 1 1 1 1];
 Static_m_set = [2 1 1 1 1];
 
 % Dynamic-score specification:
-Dyn_L_set = [5 1 1 1 1];
+Dyn_L_set = [4 1 1 1 1];
 Dyn_m_set = [2 1 1 1 1];
 
 Threshold = 0.75;   % Triangulation cleaning threshold
 
-outFolder = fullfile(pwd,'Outputs');
-
-if ~exist(outFolder,'dir')
-    mkdir(outFolder);
-end
 
 %% Step 1: Read Data
 
 load(fullfile(dataFolder,'SeasonAdjData.mat')); % Seasonally adjusted grid data
-load(fullfile(dataFolder,'FTSs.mat'));          % Functional data created in Step 1
+ftsFile = fullfile(dataFolder,'FTSs.mat');
+if ~isfile(ftsFile)
+    error(['Data/FTSs.mat was not found. Run ', ...
+           'Step1_CreateSurfaceTimeSeries.m first.']);
+end
+load(ftsFile);                                  % Functional data created in Step 1
 load(fullfile(dataFolder,'SeasComp.mat'));      % Seasonal components
 ConstrReg = readmatrix(fullfile(dataFolder,'GeoConstraints','DE_Constraints.csv'));
 
@@ -131,7 +131,8 @@ for pp = 1:nDays
     nobs_i = T-H+i-1;
 
     % True observation on the original scale
-    TrueVal = OzoneS(:,nobs_i+h) + SeasComp;
+    TrueFD  = fd(OzoneCoef(:,nobs_i+h),OzoneBasis);
+    TrueVal = eval_FEM_fd(LonOz,LatOz,TrueFD) + SeasComp;
 
     %% Static and dynamic ozone scores
 

@@ -20,9 +20,6 @@ end
 % at different stations, along with other weather variables used in the analysis
 % and geographic borders of Germany
 
-% load('Data\SeasonAdjData');
-% ConstrReg = csvread('Data/GeoConstraints/DE_Constraints.csv');
-
 load(fullfile(dataFolder,'SeasonAdjData.mat'));  % seasonally adjusted data on observed locations
 ConstrReg = readmatrix(fullfile(dataFolder,'GeoConstraints','DE_Constraints.csv'));
 
@@ -43,7 +40,8 @@ ConstrReg       = [y,x];
 
 %% Step 2: Triangulation of the selected geographic area
 % This step defines the geographical area for our analysis. In particular, 
-% it creates a triangulation of the area for each variable and generates Figure 7 in the paper's appendix.
+% it creates a triangulation of the area for each variable and generates Figure A.1 
+% in the paper's appendix.
 
 DTOzone     = delaunayTriangulation([LonOz,LatOz]);
 CleanDTOz   = CleanTriangulation(DTOzone,[ConstrReg(:,2),ConstrReg(:,1)],Threshold);
@@ -80,23 +78,15 @@ exportgraphics(fig1, fullfile(outFolder,'FigureAppTriangulation.pdf'), ...
 % the "Grid2Func" function from the "AddFunc" folder, which is included
 % in this package.
 % This step may take some time. To speed up the procedure, once surface
-% observations are created for the first time, they are saved in the
-% "Output" folder and can be reloaded on demand. To skip Step 3 and
-% load previously generated data instead, comment out this block and
-% uncomment the last line:  load('Data\FTSs');.
+% observations are created for the first time, the required coefficient
+% matrices and basis objects are saved in Data/FTSs.mat.
+% To reload the generated objects later, use: load(fullfile(dataFolder,'FTSs.mat'));
 
-[OzoneFTS,OzoneCoef,OzoneBasis]    = Grid2Func(OzoneS,DTOzone,CleanDTOz);
-[SunFTS,SunCoef,SunBasis]          = Grid2Func(SunS,DTSun,CleanDTSun);
-[PrecipFTS,PrecipCoef,PrecipBasis] = Grid2Func(PrecipS,DTPrecip,CleanDTPrec);
-[TempFTS,TempCoef,TempBasis]       = Grid2Func(TempS,DTTemp,CleanDTTemp);
-[WindFTS,WindCoef,WindBasis]       = Grid2Func(WindS,DTWind,CleanDTWind);
-OzoneFTSobj                        = {OzoneFTS,OzoneCoef,OzoneBasis};
-SunFTSobj                          = {SunFTS,SunCoef,SunBasis};
-PrecipFTSobj                       = {PrecipFTS,PrecipCoef,PrecipBasis};
-TempFTSobj                         = {TempFTS,TempCoef,TempBasis};
-WindFTSobj                         = {WindFTS,WindCoef,WindBasis};
-save(fullfile(dataFolder,'FTSs.mat'),'OzoneFTS','OzoneCoef','OzoneBasis','OzoneFTSobj',...
-    'SunFTS','SunCoef','SunBasis','SunFTSobj','PrecipFTS',...
-    'PrecipCoef','PrecipBasis','PrecipFTSobj','TempFTS',...
-    'TempCoef','TempBasis','TempFTSobj','WindFTS',...
-    'WindCoef','WindBasis','WindFTSobj');
+[~,OzoneCoef,OzoneBasis]      = Grid2Func(OzoneS,DTOzone,CleanDTOz);
+[~,SunCoef,SunBasis]          = Grid2Func(SunS,DTSun,CleanDTSun);
+[~,PrecipCoef,PrecipBasis]    = Grid2Func(PrecipS,DTPrecip,CleanDTPrec);
+[~,TempCoef,TempBasis]        = Grid2Func(TempS,DTTemp,CleanDTTemp);
+[~,WindCoef,WindBasis]        = Grid2Func(WindS,DTWind,CleanDTWind);
+save(fullfile(dataFolder,'FTSs.mat'),'OzoneCoef','OzoneBasis','SunCoef',...
+    'SunBasis','PrecipCoef','PrecipBasis','TempCoef','TempBasis',...
+    'WindCoef','WindBasis');
