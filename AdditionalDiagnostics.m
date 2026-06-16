@@ -1,5 +1,5 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Aditional Analysis
+%% Additional Diagnostics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 clear all;
 clc;
@@ -8,109 +8,116 @@ clc;
 addpath AddFunc
 addpath Data
 
+%% User settings
+Threshold = 0.75;
+K_max     = 15;
+T_tr      = 200;
+q_dyn     = 3;     % cumulative autocovariance lag
+nShow     = 6;     % number of scores shown in ACF/PACF
+nLoad     = 3;     % number of loading surfaces to plot
+
+outFolder = fullfile(pwd,'Outputs');
+if ~exist(outFolder,'dir')
+    mkdir(outFolder);
+end
+
 %% Step 1: Read Data
 % This step loads seasonally adjusted ozone concentration data observed
 % at different stations, the surface data (created in Step 1), and the
-% geographic borders of Germany
+% geographic borders of Germany.
 
-load('Data\SeasonAdjData'); % Data on the grid seasonaly addjusted
-load('Data\FTSs');          % Data given in the surface form (Step 1 has to be executed for that)
-ConstrReg = csvread('Data/GeoConstraints/DE_Constraints.csv');
+load(fullfile('Data','SeasonAdjData'));
+load(fullfile('Data','FTSs'));
+ConstrReg = csvread(fullfile('Data','GeoConstraints','DE_Constraints.csv'));
 
-% Projected Coordinates
-Threshold = 0.75;
-% project data on the plain (Gauss-Krüger Zone 3)
-wgs84           = geocrs(4326);
-proj            = projcrs(31467);
-[LonOz,  LatOz] = projfwd(proj, LatOz, LonOz);
-[x, y]          = projfwd(proj, ConstrReg(:,1), ConstrReg(:,2));
-ConstrReg       = [y,x];
+%% Projected Coordinates
+% Project data to Gauss-Krüger Zone 3.
 
-[~,T]           = size(OzoneS);
-K_max           = 15;
-T_tr            = 200;
-OzoneFTS        = fd(OzoneCoef(:,1:T_tr),OzoneBasis);
-    
+proj = projcrs(31467);
+
+[LonOz,LatOz] = projfwd(proj,LatOz,LonOz);
+[x,y]         = projfwd(proj,ConstrReg(:,1),ConstrReg(:,2));
+ConstrReg     = [y,x];
+
+[~,T] = size(OzoneS);
+
 %% Static and dynamic scores
-q_dyn           = 3; % cumulative autocovariance    
-dyn_scs         = DynamScoresSurf({OzoneCoef(:,1:T_tr),OzoneBasis}, K_max, 1, q_dyn); 
-stat_scs        = pca3D({OzoneCoef(:,1:T_tr),OzoneBasis}, K_max, 1); 
+dyn_scs  = DynamScoresSurf({OzoneCoef(:,1:T_tr),OzoneBasis}, K_max, 1, q_dyn);
+stat_scs = pca3D({OzoneCoef(:,1:T_tr),OzoneBasis}, K_max, 1);
 
-% scree plots
+%% Figure 1: Scree plots
 fg1 = figure(1);
-    plot(dyn_scs.values(1:K_max));
-    title('Scree plot');
+fg1.Position = [100,100,900,600];
 
-% comapre with static scores
-figure(2);
 subplot(2,2,1)
-    plot(stat_scs.varprop(1:K_max));
-    title('Static Scores: Prop');
-subplot(2,2,2)    
-    plot(stat_scs.values(1:K_max));
-    title('Static Scores: Vals');
+plot(stat_scs.varprop(1:K_max),'-o')
+title('Static Scores: Cumulative Variance Proportion')
+xlabel('Component')
+ylabel('Cumulative proportion')
+
+subplot(2,2,2)
+plot(stat_scs.values(1:K_max),'-o')
+title('Static Scores: Eigenvalues')
+xlabel('Component')
+ylabel('Eigenvalue')
+
 subplot(2,2,3)
-    plot(dyn_scs.varprop(1:K_max));
-    title('Dynamic Scores: Prop');
-subplot(2,2,4)    
-    plot(dyn_scs.values(1:K_max));
-    title('Dynamic Scores: Vals');
+plot(dyn_scs.varprop(1:K_max),'-o')
+title('Dynamic Scores: Cumulative Dynamic Proportion')
+xlabel('Component')
+ylabel('Cumulative proportion')
 
+subplot(2,2,4)
+plot(dyn_scs.values(1:K_max),'-o')
+title('Dynamic Scores: Eigenvalues')
+xlabel('Component')
+ylabel('Eigenvalue')
 
-% Autocovariances     
-fg2=figure(3);
-subplot(2,3,1)
-    autocorr(dyn_scs.pcascr(:,1));
-    title('1st Score Series');
-subplot(2,3,2)
-    autocorr(dyn_scs.pcascr(:,2));
-    title('2nd Score Series');
-subplot(2,3,3)
-    autocorr(dyn_scs.pcascr(:,3));
-    title('3rd Score Series');
-subplot(2,3,4)
-    autocorr(dyn_scs.pcascr(:,4));
-    title('4th Score Series');
-subplot(2,3,5)
-    autocorr(dyn_scs.pcascr(:,5));
-    title('5th Score Series');
-subplot(2,3,6)
-    autocorr(dyn_scs.pcascr(:,6));
-    title('6th Score Series');    
+exportgraphics(fg1, ...
+    fullfile(outFolder,'Diagnostics_ScreePlots.pdf'), ...
+    'BackgroundColor','none', ...
+    'Resolution',300);
 
-% Partial Autocovariances     
-figure(4);
-subplot(2,3,1)
-    parcorr(dyn_scs.pcascr(:,1));
-    title('1st Score Series');
-subplot(2,3,2)
-    parcorr(dyn_scs.pcascr(:,2));
-    title('2nd Score Series');
-subplot(2,3,3)
-    parcorr(dyn_scs.pcascr(:,3));
-    title('3rd Score Series');
-subplot(2,3,4)
-    parcorr(dyn_scs.pcascr(:,4));
-    title('4th Score Series');
-subplot(2,3,5)
-    parcorr(dyn_scs.pcascr(:,5));
-    title('5th Score Series');
-subplot(2,3,6)
-    parcorr(dyn_scs.pcascr(:,6));
-    title('6th Score Series');    
+%% Figure 2: ACF of first dynamic scores
+fg2 = figure(2);
+fg2.Position = [100,100,1100,650];
 
-
-
-outFolder = fullfile(pwd, 'Outputs');
-if ~exist(outFolder, 'dir')
-    mkdir(outFolder);
+for k = 1:nShow
+    subplot(2,3,k)
+    autocorr(dyn_scs.pcascr(:,k));
+    title(sprintf('Dynamic Score %d: ACF',k))
 end
-exportgraphics(fg1, ['Outputs/ScreePlot.pdf'], 'BackgroundColor', 'none', 'Resolution', 300);
 
+exportgraphics(fg2, ...
+    fullfile(outFolder,'Diagnostics_DynamicScores_ACF.pdf'), ...
+    'BackgroundColor','none', ...
+    'Resolution',300);
 
-%% Loading surfaces comparison: PCA vs Dynamic Scores
+%% Figure 3: PACF of first dynamic scores
+fg3 = figure(3);
+fg3.Position = [100,100,1100,650];
 
-% Prepare Germany border
+for k = 1:nShow
+    subplot(2,3,k)
+    parcorr(dyn_scs.pcascr(:,k));
+    title(sprintf('Dynamic Score %d: PACF',k))
+end
+
+exportgraphics(fg3, ...
+    fullfile(outFolder,'Diagnostics_DynamicScores_PACF.pdf'), ...
+    'BackgroundColor','none', ...
+    'Resolution',300);
+
+%% Figure 4: Loading surfaces comparison: PCA vs Dynamic Scores
+% We plot the first 3 PCA loading surfaces and the first 3 dynamic loading
+% surfaces. Since loading signs are arbitrary, we align them for clearer
+% comparison:
+%
+% (i)  each PCA loading is oriented so that its largest absolute value at
+%      the ozone locations is positive;
+% (ii) each dynamic loading is then oriented to have positive inner product
+%      with the corresponding PCA loading, based on station evaluations.
+
 Region     = [ConstrReg(:,2),ConstrReg(:,1)];
 RegionBord = polyshape(Region);
 
@@ -118,77 +125,99 @@ RegionBord = polyshape(Region);
 stat_load_coef = getcoef(stat_scs.pcafd);
 dyn_load_coef  = getcoef(dyn_scs.pcafd);
 
-% First two PCA loading surfaces
-stat_load_1 = fd(stat_load_coef(:,1), OzoneBasis);
-stat_load_2 = fd(stat_load_coef(:,2), OzoneBasis);
+% Containers for sign-aligned fd objects and station evaluations
+stat_load_fd   = cell(1,nLoad);
+dyn_load_fd    = cell(1,nLoad);
+stat_vals_cell = cell(1,nLoad);
+dyn_vals_cell  = cell(1,nLoad);
 
-% First two dynamic loading surfaces
-dyn_load_1  = fd(dyn_load_coef(:,1), OzoneBasis);
-dyn_load_2  = fd(dyn_load_coef(:,2), OzoneBasis);
+for k = 1:nLoad
 
-% Common color scale based on values at ozone stations
-vals_load = [ ...
-    eval_FEM_fd(LonOz,LatOz,stat_load_1); ...
-    eval_FEM_fd(LonOz,LatOz,stat_load_2); ...
-    eval_FEM_fd(LonOz,LatOz,dyn_load_1); ...
-    eval_FEM_fd(LonOz,LatOz,dyn_load_2)];
+    %--- Static loading
+    coef_stat_k = stat_load_coef(:,k);
+    fd_stat_k   = fd(coef_stat_k,OzoneBasis);
+    vals_stat_k = eval_FEM_fd(LonOz,LatOz,fd_stat_k);
 
+    % orient so largest absolute station value is positive
+    [~,idxMax] = max(abs(vals_stat_k));
+    if vals_stat_k(idxMax) < 0
+        coef_stat_k = -coef_stat_k;
+        vals_stat_k = -vals_stat_k;
+        fd_stat_k   = fd(coef_stat_k,OzoneBasis);
+    end
+
+    stat_load_fd{k}   = fd_stat_k;
+    stat_vals_cell{k} = vals_stat_k;
+
+    %--- Dynamic loading
+    coef_dyn_k = dyn_load_coef(:,k);
+    fd_dyn_k   = fd(coef_dyn_k,OzoneBasis);
+    vals_dyn_k = eval_FEM_fd(LonOz,LatOz,fd_dyn_k);
+
+    % orient to match corresponding PCA loading
+    if sum(vals_stat_k .* vals_dyn_k) < 0
+        coef_dyn_k = -coef_dyn_k;
+        vals_dyn_k = -vals_dyn_k;
+        fd_dyn_k   = fd(coef_dyn_k,OzoneBasis);
+    end
+
+    dyn_load_fd{k}   = fd_dyn_k;
+    dyn_vals_cell{k} = vals_dyn_k;
+end
+
+% Common symmetric color scale across all 6 loadings
+vals_load = [];
+for k = 1:nLoad
+    vals_load = [vals_load; stat_vals_cell{k}; dyn_vals_cell{k}];
+end
 cmax_load = max(abs(vals_load),[],'all');
 
 % Plot
-fg5 = figure(5);
-fg5.Position = [100, 100, 1100, 700];
+fg4 = figure(4);
+fg4.Position = [100,100,1300,750];
 
-subplot(2,2,1)
+for k = 1:nLoad
+    subplot(2,3,k)
     hold on
-    plot(RegionBord, 'FaceColor', 'none');
-    plot(stat_load_1, [], [], [], 100);
+    plot(RegionBord,'FaceColor','none');
+    plot(stat_load_fd{k},[],[],[],100);
     hold off
     axis equal tight
     view(2)
     colormap(jet)
-    clim([-cmax_load cmax_load])
+    % clim([-cmax_load cmax_load])
     colorbar
-    title('PCA: 1st loading')
+    title(sprintf('PCA: Loading %d',k))
+    xlabel('Easting')
+    ylabel('Northing')
+end
 
-subplot(2,2,2)
+for k = 1:nLoad
+    subplot(2,3,nLoad+k)
     hold on
-    plot(RegionBord, 'FaceColor', 'none');
-    plot(stat_load_2, [], [], [], 100);
+    plot(RegionBord,'FaceColor','none');
+    plot(dyn_load_fd{k},[],[],[],100);
     hold off
     axis equal tight
     view(2)
     colormap(jet)
-    clim([-cmax_load cmax_load])
+    % clim([-cmax_load cmax_load])
     colorbar
-    title('PCA: 2nd loading')
+    title(sprintf('DS: Loading %d',k))
+    xlabel('Easting')
+    ylabel('Northing')
+end
 
-subplot(2,2,3)
-    hold on
-    plot(RegionBord, 'FaceColor', 'none');
-    plot(dyn_load_1, [], [], [], 100);
-    hold off
-    axis equal tight
-    view(2)
-    colormap(jet)
-    clim([-cmax_load cmax_load])
-    colorbar
-    title('DS: 1st loading')
+exportgraphics(fg4, ...
+    fullfile(outFolder,'Diagnostics_LoadingSurfaces_PCA_DS.pdf'), ...
+    'BackgroundColor','none', ...
+    'Resolution',300, ...
+    'ContentType','vector');
 
-subplot(2,2,4)
-    hold on
-    plot(RegionBord, 'FaceColor', 'none');
-    plot(dyn_load_2, [], [], [], 100);
-    hold off
-    axis equal tight
-    view(2)
-    colormap(jet)
-    clim([-cmax_load cmax_load])
-    colorbar
-    title('DS: 2nd loading')
+exportgraphics(fg4, ...
+    fullfile(outFolder,'Diagnostics_LoadingSurfaces_PCA_DS.png'), ...
+    'BackgroundColor','white', ...
+    'Resolution',300);
 
-exportgraphics(fg5, ...
-    fullfile(outFolder,'LoadingSurfaces_PCA_DS.pdf'), ...
-    'BackgroundColor', 'none', ...
-    'Resolution', 300, ...
-    'ContentType', 'vector');
+fprintf('\nAdditional diagnostics completed successfully.\n');
+fprintf('Outputs saved to: %s\n', outFolder);
