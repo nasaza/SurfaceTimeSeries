@@ -3,6 +3,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 clear all;
 clc;
+close all;
 
 %% Short Info
 % This script jointly selects:
@@ -18,10 +19,19 @@ clc;
 % training sample used in the forecasting exercise. Results, tables, and
 % figures are saved directly to the Outputs folder.
 
-%% Add Libraries
+%% Add Libraries and paths
 
-addpath AddFunc
-addpath Data
+scriptFolder = fileparts(mfilename('fullpath'));
+rootFolder   = fileparts(scriptFolder);
+addpath(fullfile(rootFolder,'AddFunc'));
+
+dataFolder   = fullfile(rootFolder,'Data');
+outFolder    = fullfile(rootFolder,'Outputs');
+
+if ~exist(outFolder,'dir')
+    mkdir(outFolder);
+end
+
 
 %% User settings
 % Practitioners may want to change only this block.
@@ -31,14 +41,17 @@ K_max  = 15;   % Maximum number of dynamic scores considered
 p_max  = 7;    % Maximum VAR lag order considered
 q_dyn  = 2;    % Lag order in cumulative autocovariance operator
 
-outFolder = fullfile(pwd,'Outputs');
-if ~exist(outFolder,'dir')
-    mkdir(outFolder);
-end
 
 %% Load functional ozone data created in Step 1
 
-load(fullfile('Data','FTSs'),'OzoneCoef','OzoneBasis');
+ftsFile = fullfile(dataFolder,'FTSs.mat');
+
+if ~isfile(ftsFile)
+    error(['Data/FTSs.mat was not found. Run ', ...
+           'Step1_CreateSurfaceTimeSeries.m first.']);
+end
+
+load(ftsFile,'OzoneCoef','OzoneBasis');
 
 if T_tr > size(OzoneCoef,2)
     error('T_tr exceeds the number of available ozone observations.');
@@ -48,11 +61,11 @@ if K_max > size(OzoneCoef,1)
     error('K_max exceeds the number of ozone basis coefficients.');
 end
 
+
 %% Run Otto-Salish grid search
 
 FTSobj = {OzoneCoef(:,1:T_tr),OzoneBasis};
-
-OS = OttoSalishIC(FTSobj,K_max,p_max,q_dyn);
+OS     = OttoSalishIC(FTSobj,K_max,p_max,q_dyn);
 
 %% Display selected specifications
 

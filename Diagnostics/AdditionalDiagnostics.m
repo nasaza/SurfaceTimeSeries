@@ -4,31 +4,38 @@
 clear all;
 clc;
 
-%% Add Libraries
-addpath AddFunc
-addpath Data
+%% Add Libraries and path
+scriptFolder = fileparts(mfilename('fullpath'));
+rootFolder   = fileparts(scriptFolder);
+addpath(fullfile(rootFolder,'AddFunc'));
 
-%% User settings
-Threshold = 0.75;
-K_max     = 15;
-T_tr      = 200;
-q_dyn     = 3;     % cumulative autocovariance lag
-nShow     = 6;     % number of scores shown in ACF/PACF
-nLoad     = 3;     % number of loading surfaces to plot
-
-outFolder = fullfile(pwd,'Outputs');
+dataFolder = fullfile(rootFolder,'Data');
+outFolder  = fullfile(rootFolder,'Outputs');
 if ~exist(outFolder,'dir')
     mkdir(outFolder);
 end
+
+%% User settings
+K_max     = 15;
+T_tr      = 200;
+q_dyn     = 2;     % cumulative autocovariance lag
+nShow     = 6;     % number of scores shown in ACF/PACF
+nLoad     = 3;     % number of loading surfaces to plot
 
 %% Step 1: Read Data
 % This step loads seasonally adjusted ozone concentration data observed
 % at different stations, the surface data (created in Step 1), and the
 % geographic borders of Germany.
 
-load(fullfile('Data','SeasonAdjData'));
-load(fullfile('Data','FTSs'));
-ConstrReg = csvread(fullfile('Data','GeoConstraints','DE_Constraints.csv'));
+load(fullfile(dataFolder,'SeasonAdjData.mat'),'LonOz','LatOz');
+ftsFile = fullfile(dataFolder,'FTSs.mat');
+if ~isfile(ftsFile)
+    error(['Data/FTSs.mat was not found. Run ', ...
+           'Step1_CreateSurfaceTimeSeries.m first.']);
+end
+load(ftsFile,'OzoneCoef','OzoneBasis');
+
+ConstrReg = readmatrix(fullfile(dataFolder,'GeoConstraints','DE_Constraints.csv'));
 
 %% Projected Coordinates
 % Project data to Gauss-Krüger Zone 3.
@@ -39,13 +46,13 @@ proj = projcrs(31467);
 [x,y]         = projfwd(proj,ConstrReg(:,1),ConstrReg(:,2));
 ConstrReg     = [y,x];
 
-[~,T] = size(OzoneS);
-
 %% Static and dynamic scores
+
 dyn_scs  = DynamScoresSurf({OzoneCoef(:,1:T_tr),OzoneBasis}, K_max, 1, q_dyn);
 stat_scs = pca3D({OzoneCoef(:,1:T_tr),OzoneBasis}, K_max, 1);
 
 %% Figure 1: Scree plots
+
 fg1 = figure(1);
 fg1.Position = [100,100,900,600];
 

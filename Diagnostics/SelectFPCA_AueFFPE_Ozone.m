@@ -11,30 +11,45 @@ clc;
 % using the functional final prediction error criterion of
 % Aue, Dubart Norinho and Hoermann (2015).
 
-%% Add Libraries
-addpath AddFunc
-addpath Data
+%% Add Libraries and path
 
-%% User settings
-H      = 165;
-d_max  = 10;
-p_max  = 5;
+scriptFolder = fileparts(mfilename('fullpath'));
+rootFolder   = fileparts(scriptFolder);
+addpath(fullfile(rootFolder,'AddFunc'));
 
-outFolder = fullfile(pwd,'Outputs');
+dataFolder   = fullfile(rootFolder,'Data');
+outFolder    = fullfile(rootFolder,'Outputs');
 if ~exist(outFolder,'dir')
     mkdir(outFolder);
 end
 
-%% Read functional data
-load(fullfile('Data','SeasonAdjData'));
-load(fullfile('Data','FTSs'));
+%% User settings
+H      = 165;
+d_max  = 10;
+p_max  = 7;
 
-[~,T] = size(OzoneS);
-T_tr  = T-H;
+%% Read functional data
+
+ftsFile = fullfile(dataFolder,'FTSs.mat');
+
+if ~isfile(ftsFile)
+    error(['Data/FTSs.mat was not found. Run ', ...
+           'Step1_CreateSurfaceTimeSeries.m first.']);
+end
+
+load(ftsFile,'OzoneCoef','OzoneBasis');
+
+T    = size(OzoneCoef,2);
+T_tr = T-H;
 
 if T_tr <= 0
     error('H must be smaller than the number of observations.');
 end
+
+if d_max > size(OzoneCoef,1)
+    error('d_max exceeds the number of ozone basis coefficients.');
+end
+
 
 %% Static FPCA on initial training sample
 stat_scs = pca3D({OzoneCoef(:,1:T_tr),OzoneBasis},d_max,1);
